@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+
+  frontend:
+    container_name: frontend
+    build:
+      context: './frontend'
+    restart: always
+    ports:
+      - '3000:3000'
+    volumes:
+      - './frontend:/home/node/app:delegated'
+    command: 'start'
+
+  postgres:
+    container_name: postgres
+    image: postgres:13-alpine
+    command: [ 'postgres', '-c', 'log_statement=all' ]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: netgroup
+    volumes:
+      - ./.docker/postgres:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    container_name: backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+    build:
+      context: ./backend
+    ports:
+      - '8080:8080'
+    command: ./gradlew test bootRun
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/netgroup
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
